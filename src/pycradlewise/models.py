@@ -326,6 +326,49 @@ class CradlewiseCradle:
         val = self.state.get("keepMusicOnDuringSleepLevel")
         return int(val) if val is not None else None
 
+    @property
+    def active_soothing(self) -> bool:
+        """Return True if the crib is actively soothing, excluding the active start recipe."""
+        if self.start_recipe_on:
+            return False
+
+        bounce_lvl = self.bounce_level
+        if bounce_lvl is None:
+            bounce_lvl = -1
+
+        baseline_bounce = (
+            self.keep_bounce_on_during_sleep_level
+            if self.keep_bounce_on_during_sleep
+            else -1
+        )
+        if baseline_bounce is None:
+            baseline_bounce = -1
+
+        bounce_escalated = (
+            bounce_lvl != -1
+            and bounce_lvl > baseline_bounce
+        )
+
+        music_lvl = self.music_level
+        if music_lvl is None:
+            music_lvl = -1
+
+        baseline_music = (
+            self.keep_music_on_during_sleep_level
+            if self.keep_music_on_during_sleep
+            else -1
+        )
+        if baseline_music is None:
+            baseline_music = -1
+
+        music_escalated = (
+            music_lvl != -1
+            and music_lvl > baseline_music
+        )
+
+        return bounce_escalated or music_escalated
+
+
 
 
     def update_state(self, new_state: dict[str, Any]) -> None:

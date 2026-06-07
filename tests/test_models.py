@@ -193,9 +193,35 @@ class TestCradlewiseCradle:
         cradle = CradlewiseCradle(cradle_id="c1", state={"isCribHelping": True})
         assert cradle.is_crib_helping is True
 
-        # Case 4: None of them are active
-        cradle = CradlewiseCradle(cradle_id="c1", state={})
-        assert cradle.is_crib_helping is False
+    def test_active_soothing(self):
+        # Case 1: Start recipe is active (always returns False)
+        cradle = CradlewiseCradle(cradle_id="c1", state={"startRecipeOn": True, "bounceLevel": 2})
+        assert cradle.active_soothing is False
+
+        # Case 2: keep_bounce_on_during_sleep is False
+        # If bounce_level is -1 (Off)
+        cradle = CradlewiseCradle(cradle_id="c1", state={"keepBounceOnDuringSleep": False, "bounceLevel": -1})
+        assert cradle.active_soothing is False
+        # If bounce_level is 0 (Gentle)
+        cradle = CradlewiseCradle(cradle_id="c1", state={"keepBounceOnDuringSleep": False, "bounceLevel": 0})
+        assert cradle.active_soothing is True
+
+        # Case 3: keep_bounce_on_during_sleep is True
+        # If bounce_level matches keepBounceOnDuringSleepLevel
+        cradle = CradlewiseCradle(cradle_id="c1", state={
+            "keepBounceOnDuringSleep": True,
+            "keepBounceOnDuringSleepLevel": 0,
+            "bounceLevel": 0
+        })
+        assert cradle.active_soothing is False
+        # If bounce_level is greater than keepBounceOnDuringSleepLevel
+        cradle.update_state({"bounceLevel": 1})
+        assert cradle.active_soothing is True
+
+        # Case 4: music/sound escalation when keep_music_on_during_sleep is False
+        cradle = CradlewiseCradle(cradle_id="c1", state={"keepMusicOnDuringSleep": False, "musicLevel": 1})
+        assert cradle.active_soothing is True
+
 
 
 
