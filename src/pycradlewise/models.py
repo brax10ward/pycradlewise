@@ -53,7 +53,7 @@ class CradlewiseCradle:
         if self.bouncing:
             return True
         # Secondary indicator: startRecipe is active
-        if self.state.get("startRecipeEnabled"):
+        if self.state.get("startRecipeOn"):
             return True
         # Fallback
         return bool(self.state.get("isCribHelping", False))
@@ -285,6 +285,12 @@ class CradlewiseCradle:
 
     @property
     def start_recipe_on(self) -> bool:
+        """Return True if the start recipe session is currently active."""
+        return bool(self.state.get("startRecipeOn", False))
+
+    @property
+    def start_recipe_enabled(self) -> bool:
+        """Return True if the auto-start recipe feature is enabled."""
         return bool(self.state.get("startRecipeEnabled", False))
 
     @property
