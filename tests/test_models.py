@@ -159,6 +159,45 @@ class TestCradlewiseCradle:
         assert cradle.responsivity_level == "Custom1"
         assert cradle.cry_sensitivity_level == "Custom2"
 
+    def test_start_recipe_properties(self):
+        cradle = CradlewiseCradle(cradle_id="c1", state={})
+        assert cradle.start_recipe_on is False
+        assert cradle.start_recipe_enabled is False
+        assert cradle.start_recipe_lock_duration is None
+        assert cradle.start_recipe_bounce_level is None
+        assert cradle.start_recipe_music_level is None
+
+        cradle.update_state({
+            "startRecipeOn": True,
+            "startRecipeEnabled": True,
+            "startRecipeLockDuration": 60,
+            "startRecipeBounceLevel": 2,
+            "startRecipeMusicLevel": 1,
+        })
+        assert cradle.start_recipe_on is True
+        assert cradle.start_recipe_enabled is True
+        assert cradle.start_recipe_lock_duration == 60
+        assert cradle.start_recipe_bounce_level == 2
+        assert cradle.start_recipe_music_level == 1
+
+    def test_is_crib_helping(self):
+        # Case 1: Bouncing is active
+        cradle = CradlewiseCradle(cradle_id="c1", state={"actuator": {"on": True, "amplitude": 2}})
+        assert cradle.is_crib_helping is True
+
+        # Case 2: startRecipeOn is True
+        cradle = CradlewiseCradle(cradle_id="c1", state={"startRecipeOn": True})
+        assert cradle.is_crib_helping is True
+
+        # Case 3: isCribHelping raw key is True
+        cradle = CradlewiseCradle(cradle_id="c1", state={"isCribHelping": True})
+        assert cradle.is_crib_helping is True
+
+        # Case 4: None of them are active
+        cradle = CradlewiseCradle(cradle_id="c1", state={})
+        assert cradle.is_crib_helping is False
+
+
 
 
 
