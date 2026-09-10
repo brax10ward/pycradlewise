@@ -167,7 +167,8 @@ class CradlewiseClient:
         """Fetch the latest state and online status for a cradle."""
         try:
             state = await self.get_cradle_state(cradle.cradle_id)
-            cradle.update_state(state)
+            _LOGGER.debug("Cradle %s state: %s", cradle.cradle_id, state)
+            cradle.replace_state(state)
         except Exception as err:
             _LOGGER.debug("Failed to get state for %s: %s", cradle.cradle_id, err)
 
