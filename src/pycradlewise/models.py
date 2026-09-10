@@ -8,6 +8,16 @@ from typing import Any
 from .const import SLEEP_PHASE_MAP, SLEEP_STAGE_MAP
 
 
+def _normalize_state(value: Any) -> str:
+    """Lowercase a raw state string and unify separators.
+
+    The cloud reports states with varying separators ("baby not present",
+    "baby-not-present", "baby_not_present"). Substring matching against the
+    underscore form only works if every variant is normalized first.
+    """
+    return str(value).lower().replace(" ", "_").replace("-", "_")
+
+
 @dataclass
 class CradlewiseCradle:
     """Represents a Cradlewise crib."""
@@ -30,9 +40,10 @@ class CradlewiseCradle:
         if bool(self.state.get("baby_present", self.state.get("babyPresent", False))):
             return True
 
-        # 2. Infer presence from sleep phase if flags are missing/stale
+        # 2. Infer presence from sleep phase if flags are missing/stale.
+        # Use an allowlist: an unrecognized phase must not imply occupancy.
         phase = self.sleep_phase_name.lower()
-        return phase not in ("away", "unknown")
+        return phase in ("awake", "stirring", "sleep")
 
     @property
     def baby_sleep_state(self) -> str:
@@ -222,11 +233,13 @@ class CradlewiseCradle:
     def sleep_phase_name(self) -> str:
         """Human-readable coarse sleep phase (Away, Awake, Stirring, Sleep)."""
         # 1. Prioritize granular real-time status
-        val = self.state.get("baby_sleep_state") or self.state.get("babySleepState")
+        val = self.state.get("baby_sleep_state")
+        if val is None:
+            val = self.state.get("babySleepState")
         if val is not None:
             if isinstance(val, int):
                 return SLEEP_PHASE_MAP.get(val, f"unknown ({val})").replace("_", " ").title()
-            sleep_state = str(val).lower()
+            sleep_state = _normalize_state(val)
             if "unknown" in sleep_state:
                 return "Unknown"
             if "not_present" in sleep_state or "away" in sleep_state:
@@ -235,7 +248,11 @@ class CradlewiseCradle:
                 return "Sleep"
             if "stirring" in sleep_state:
                 return "Stirring"
-            return "Awake"
+            # Known awake stages: agitated, active_awake, quite_awake.
+            # Anything else is unrecognized and must not imply occupancy.
+            if "awake" in sleep_state or "agitated" in sleep_state:
+                return "Awake"
+            return "Unknown"
 
         # 2. Fall back to coarse sleep phase raw
         raw = self.sleep_phase_raw
@@ -247,7 +264,7 @@ class CradlewiseCradle:
         if val_fallback is not None:
             if isinstance(val_fallback, int):
                 return SLEEP_PHASE_MAP.get(val_fallback, f"unknown ({val_fallback})").replace("_", " ").title()
-            sleep_state = str(val_fallback).lower()
+            sleep_state = _normalize_state(val_fallback)
             if "unknown" in sleep_state:
                 return "Unknown"
             if "not_present" in sleep_state or "away" in sleep_state:
@@ -256,14 +273,20 @@ class CradlewiseCradle:
                 return "Sleep"
             if "stirring" in sleep_state:
                 return "Stirring"
-            return "Awake"
+            # Known awake stages: agitated, active_awake, quite_awake.
+            # Anything else is unrecognized and must not imply occupancy.
+            if "awake" in sleep_state or "agitated" in sleep_state:
+                return "Awake"
+            return "Unknown"
 
         return "Unknown"
 
     @property
     def sleep_stage_name(self) -> str:
         """Human-readable granular sleep stage (Deep Sleep, Light Sleep, Quiet Awake, etc.)."""
-        val = self.state.get("baby_sleep_state") or self.state.get("babySleepState")
+        val = self.state.get("baby_sleep_state")
+        if val is None:
+            val = self.state.get("babySleepState")
         if val is not None:
             if isinstance(val, int):
                 return SLEEP_STAGE_MAP.get(val, f"unknown ({val})").replace("_", " ").title()
@@ -370,6 +393,17 @@ class CradlewiseCradle:
 
 
 
+
+    def replace_state(self, new_state: dict[str, Any]) -> None:
+        """Replace state wholesale (from a full REST fetch).
+
+        A full fetch is authoritative: keys absent from it are absent on the
+        device. Merging one would let a stale value (notably ``babyPresent``)
+        persist indefinitely after the cloud stops reporting it.
+        """
+        if not new_state:
+            return
+        self.state = dict(new_state)
 
     def update_state(self, new_state: dict[str, Any]) -> None:
         """Merge partial state update (from MQTT delta)."""

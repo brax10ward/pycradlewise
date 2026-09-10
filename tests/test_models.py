@@ -38,6 +38,40 @@ class TestCradlewiseCradle:
         cradle = CradlewiseCradle(cradle_id="c1", state={"baby_present": False})
         assert cradle.baby_present is False
 
+    def test_baby_present_separator_variants(self):
+        """A 'not present' state must clear occupancy whatever separator it uses."""
+        for raw in ("baby not present", "baby-not-present", "baby_not_present",
+                    "Baby Not Present", "BABY NOT PRESENT", "not present"):
+            cradle = CradlewiseCradle(cradle_id="c1", state={"babySleepState": raw})
+            assert cradle.sleep_phase_name == "Away", raw
+            assert cradle.baby_present is False, raw
+
+    def test_baby_present_unrecognized_phase_is_not_occupancy(self):
+        """An unknown phase string must not be reported as occupied."""
+        cradle = CradlewiseCradle(cradle_id="c1", state={"babySleepState": "some_new_state"})
+        assert cradle.baby_present is False
+
+    def test_baby_present_zero_sleep_state_not_swallowed(self):
+        """Integer 0 ('not present') is falsy and must not fall through."""
+        cradle = CradlewiseCradle(cradle_id="c1", state={"baby_sleep_state": 0})
+        assert cradle.sleep_phase_name == "Away"
+        assert cradle.baby_present is False
+
+    def test_full_state_replaces_stale_presence(self):
+        """A full refresh must drop keys the cloud stopped sending."""
+        cradle = CradlewiseCradle(cradle_id="c1", state={"babyPresent": True})
+        assert cradle.baby_present is True
+        cradle.replace_state({"babySleepState": "baby not present"})
+        assert "babyPresent" not in cradle.state
+        assert cradle.baby_present is False
+
+    def test_update_state_still_merges(self):
+        """Partial deltas must keep merging."""
+        cradle = CradlewiseCradle(cradle_id="c1", state={"babyPresent": True, "mode": "Crib"})
+        cradle.update_state({"mode": "Normal"})
+        assert cradle.state["babyPresent"] is True
+        assert cradle.state["mode"] == "Normal"
+
     def test_mode_properties(self, sample_shadow_state):
         cradle = CradlewiseCradle(cradle_id="c1", state=sample_shadow_state)
         assert cradle.cradle_mode == "Normal"
