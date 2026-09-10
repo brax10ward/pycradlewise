@@ -21,10 +21,43 @@ class TestCradlewiseCradle:
         assert cradle.baby_sleep_state == "sleeping"
         assert cradle.is_crib_helping is True
 
-    def test_baby_present_inference(self):
-        # Case 1: Explicitly False, but sleep phase is 'awake'
-        cradle = CradlewiseCradle(cradle_id="c1", state={"baby_present": False, "baby_sleep_state": "awake"})
+    def test_explicit_flag_wins_over_inference(self):
+        """An explicit False is authoritative and must not fall through."""
+        cradle = CradlewiseCradle(
+            cradle_id="c1",
+            state={"baby_present": False, "baby_sleep_state": "awake"},
+        )
+        assert cradle.baby_present is False
+
+        cradle = CradlewiseCradle(cradle_id="c1", state={"babyPresent": False})
+        assert cradle.baby_present is False
+
+    def test_explicit_flag_read_from_raw_shadow(self):
+        cradle = CradlewiseCradle(
+            cradle_id="c1", state={"rawShadow": {"babyPresent": True}}
+        )
         assert cradle.baby_present is True
+
+    def test_real_empty_crib_payload(self):
+        """Shape of a real cloud response for an empty crib."""
+        cradle = CradlewiseCradle(
+            cradle_id="c1",
+            state={
+                "baby_present": False,
+                "baby_sleep_state": "Baby not present",
+                "detectedCradleMode": "Crib",
+                "rawShadow": {
+                    "babyPresent": False,
+                    "babySleepState": 0,
+                    "babySleepPhaseV2": {"eventValue": 0},
+                },
+            },
+        )
+        assert cradle.baby_present is False
+        assert cradle.sleep_phase_name == "Away"
+        assert cradle.sleep_stage_name == "Baby Not Present"
+
+    def test_baby_present_inference(self):
 
         # Case 2: Missing flag, but sleep phase is numeric (1 = awake)
         cradle = CradlewiseCradle(cradle_id="c1", state={"babySleepPhase": "1"})

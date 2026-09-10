@@ -35,13 +35,26 @@ class CradlewiseCradle:
 
     @property
     def baby_present(self) -> bool:
-        """Return True if the baby is in the crib."""
-        # 1. Check explicit occupancy flags
-        if bool(self.state.get("baby_present", self.state.get("babyPresent", False))):
-            return True
+        """Return True if the baby is in the crib.
 
-        # 2. Infer presence from sleep phase if flags are missing/stale.
-        # Use an allowlist: an unrecognized phase must not imply occupancy.
+        The device reports occupancy directly and that reading is
+        authoritative. Only fall back to inferring it from the sleep phase
+        when no explicit flag is reported at all -- testing the flag for
+        truthiness instead of presence would treat a legitimate ``False`` as
+        a missing value and hand control to the fallback.
+        """
+        # 1. Explicit occupancy flag, flattened or from the raw shadow
+        raw_shadow = self.state.get("rawShadow")
+        sources: list[dict[str, Any]] = [self.state]
+        if isinstance(raw_shadow, dict):
+            sources.append(raw_shadow)
+        for source in sources:
+            for key in ("baby_present", "babyPresent"):
+                if key in source:
+                    return bool(source[key])
+
+        # 2. No flag reported -- infer from the sleep phase. Use an allowlist
+        # so an unrecognized phase does not imply occupancy.
         phase = self.sleep_phase_name.lower()
         return phase in ("awake", "stirring", "sleep")
 
